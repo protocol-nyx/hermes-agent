@@ -523,6 +523,20 @@ def test_codex_provider_strips_provider_prefix_from_model(monkeypatch):
     assert shell.model == "gpt-5.3-codex"
 
 
+def test_chat_parser_accepts_configured_provider_names(monkeypatch):
+    captured = {}
+
+    def _fake_cmd_chat(args):
+        captured["provider"] = args.provider
+
+    monkeypatch.setattr(hermes_main, "cmd_chat", _fake_cmd_chat)
+    monkeypatch.setattr(sys, "argv", ["hermes", "chat", "--provider", "bifrost", "-q", "hello"])
+
+    hermes_main.main()
+
+    assert captured["provider"] == "bifrost"
+
+
 def test_cmd_model_falls_back_to_auto_on_invalid_provider(monkeypatch, capsys):
     monkeypatch.setattr(
         "hermes_cli.config.load_config",

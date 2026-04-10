@@ -27,6 +27,7 @@ from hermes_cli.auth import (
     has_usable_secret,
 )
 from hermes_cli.config import load_config
+from hermes_cli.providers import TRANSPORT_TO_API_MODE, resolve_user_provider
 from hermes_constants import OPENROUTER_BASE_URL
 
 
@@ -350,6 +351,50 @@ def _resolve_named_custom_runtime(
     }
 
 
+def _resolve_named_user_config_runtime(
+    *,
+    requested_provider: str,
+    explicit_api_key: Optional[str] = None,
+    explicit_base_url: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    requested_norm = (requested_provider or "").strip().lower()
+    if not requested_norm or requested_norm in {"auto", "custom"} or requested_norm.startswith("custom:"):
+        return None
+
+    config = load_config()
+    user_providers = config.get("providers")
+    if not isinstance(user_providers, dict):
+        return None
+
+    provider_def = resolve_user_provider(requested_norm, user_providers)
+    if provider_def is None:
+        return None
+
+    base_url = ((explicit_base_url or "").strip() or provider_def.base_url or "").rstrip("/")
+    if not base_url:
+        return None
+
+    pool_result = _try_resolve_from_custom_pool(
+        base_url,
+        provider_def.id,
+        TRANSPORT_TO_API_MODE.get(provider_def.transport, "chat_completions"),
+    )
+    if pool_result:
+        return pool_result
+
+    api_key_candidates = [(explicit_api_key or "").strip()]
+    api_key_candidates.extend(os.getenv(env_var, "").strip() for env_var in provider_def.api_key_env_vars)
+    api_key = next((candidate for candidate in api_key_candidates if has_usable_secret(candidate)), "")
+
+    return {
+        "provider": provider_def.id,
+        "api_mode": TRANSPORT_TO_API_MODE.get(provider_def.transport, "chat_completions"),
+        "base_url": base_url,
+        "api_key": api_key or "no-key-required",
+        "source": f"user_provider:{provider_def.name}",
+    }
+
+
 def _resolve_openrouter_runtime(
     *,
     requested_provider: str,
@@ -596,6 +641,15 @@ def resolve_runtime_provider(
     if custom_runtime:
         custom_runtime["requested_provider"] = requested_provider
         return custom_runtime
+
+    user_config_runtime = _resolve_named_user_config_runtime(
+        requested_provider=requested_provider,
+        explicit_api_key=explicit_api_key,
+        explicit_base_url=explicit_base_url,
+    )
+    if user_config_runtime:
+        user_config_runtime["requested_provider"] = requested_provider
+        return user_config_runtime
 
     provider = resolve_provider(
         requested_provider,
