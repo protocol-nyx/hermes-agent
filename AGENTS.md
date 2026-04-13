@@ -8,6 +8,18 @@ Instructions for AI coding assistants and developers working on the hermes-agent
 source venv/bin/activate  # ALWAYS activate before running Python
 ```
 
+## Fork Branch Strategy (Protocol Nyx)
+
+This fork uses a four-layer branch model.
+
+- `main` = protected mirror of the latest adopted upstream release. It should move only when upstream ships a newer release.
+- `nyx-patches` = durable Nyx control plane. All custom workflows, release glue, and fork-only behavior live here.
+- `integration/proposed` = generated candidate branch. Automation rebuilds it from `main` plus a merge of `nyx-patches` and opens a PR.
+- `integration/current` = protected operational branch. It receives updates only by PR from `integration/proposed`, then drives integration tests, releases, and downstream notifications.
+- `issue/*` and `dev/*` branches must branch from `nyx-patches` and merge back into `nyx-patches` by PR.
+
+Do not put durable Nyx-only automation directly on `main`. Do not hand-edit `integration/proposed`. If a fix is discovered while validating or releasing from `integration/current`, port it back to `nyx-patches` immediately.
+
 ## Project Structure
 
 ```
@@ -351,8 +363,9 @@ Cache-breaking forces dramatically higher costs. The ONLY time we alter context 
 
 ### Background Process Notifications (Gateway)
 
-When `terminal(background=true, check_interval=...)` is used, the gateway runs a watcher that
-pushes status updates to the user's chat. Control verbosity with `display.background_process_notifications`
+When `terminal(background=true, notify_on_complete=true)` is used, the gateway runs a watcher that
+detects process completion and triggers a new agent turn. Control verbosity of background process
+messages with `display.background_process_notifications`
 in config.yaml (or `HERMES_BACKGROUND_NOTIFICATIONS` env var):
 
 - `all` — running-output updates + final message (default)

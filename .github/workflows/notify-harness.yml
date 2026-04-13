@@ -1,0 +1,43 @@
+name: Notify Harness On Hermes Update
+
+on:
+  push:
+    branches: [integration/current]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    if: github.repository == 'protocol-nyx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.NYX_GH_TOKEN }}
+      HARNESS_REPO: protocol-nyx/hermes-harness
+    steps:
+      - name: Require cross-repo token
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "Missing NYX_GH_TOKEN secret in protocol-nyx/hermes-agent"
+            echo "Add a PAT with repo scope so this workflow can dispatch harness rebuilds."
+            exit 1
+          fi
+
+      - name: Dispatch harness rebuild
+        run: |
+          set -euo pipefail
+          gh api repos/${HARNESS_REPO}/dispatches \
+            -X POST \
+            -f event_type='hermes_agent_updated' \
+            -F client_payload[source_repo]="$GITHUB_REPOSITORY" \
+            -F client_payload[source_sha]="$GITHUB_SHA" \
+            -F client_payload[source_ref]="$GITHUB_REF" \
+            -F client_payload[trigger]='fork_push'

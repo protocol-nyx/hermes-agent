@@ -2,9 +2,10 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [integration/current]
   pull_request:
-    branches: [main]
+    branches: [integration/current]
+  workflow_dispatch:
 
 # Cancel in-progress runs for the same PR/branch
 concurrency:
