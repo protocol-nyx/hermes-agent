@@ -886,6 +886,12 @@ def list_authenticated_providers(
             if default_model:
                 models_list.append(default_model)
 
+            cfg_models = ep_cfg.get("models", [])
+            if isinstance(cfg_models, list):
+                for model_id in cfg_models:
+                    if model_id and model_id not in models_list:
+                        models_list.append(model_id)
+
             # Try to probe /v1/models if URL is set (but don't block on it)
             # For now just show what we know from config
             results.append({
@@ -923,6 +929,12 @@ def list_authenticated_providers(
             default_model = (entry.get("model") or "").strip()
             if default_model:
                 models_list.append(default_model)
+
+            cfg_models = ep_cfg.get("models", [])
+            if isinstance(cfg_models, list):
+                for model_id in cfg_models:
+                    if model_id and model_id not in models_list:
+                        models_list.append(model_id)
 
             results.append({
                 "slug": slug,

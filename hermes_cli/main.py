@@ -4462,9 +4462,8 @@ For more help on a command:
     )
     chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openrouter", "nous", "openai-codex", "copilot-acp", "copilot", "anthropic", "gemini", "huggingface", "zai", "kimi-coding", "minimax", "minimax-cn", "kilocode", "xiaomi"],
         default=None,
-        help="Inference provider (default: auto)"
+        help="Inference provider (built-in or configured custom provider; default: auto)"
     )
     chat_parser.add_argument(
         "-v", "--verbose",
