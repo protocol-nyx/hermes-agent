@@ -955,6 +955,29 @@ def resolve_provider(
     if normalized in PROVIDER_REGISTRY:
         return normalized
     if normalized != "auto":
+        try:
+            config = read_raw_config() or {}
+        except Exception:
+            config = {}
+
+        user_providers = config.get("providers")
+        if isinstance(user_providers, dict):
+            entry = user_providers.get(normalized)
+            if isinstance(entry, dict):
+                return normalized
+
+        custom_providers = config.get("custom_providers")
+        if isinstance(custom_providers, list):
+            for entry in custom_providers:
+                if not isinstance(entry, dict):
+                    continue
+                custom_name = str(entry.get("name") or "").strip().lower().replace(" ", "-")
+                if not custom_name:
+                    continue
+                custom_key = f"custom:{custom_name}"
+                if normalized in {custom_name, custom_key}:
+                    return custom_key
+
         # Check for common config.yaml issues that cause this error
         _config_hint = _get_config_hint_for_unknown_provider(normalized)
         msg = f"Unknown provider '{normalized}'."

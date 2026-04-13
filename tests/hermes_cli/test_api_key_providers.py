@@ -225,6 +225,37 @@ class TestResolveProvider:
     def test_alias_huggingface_hub(self):
         assert resolve_provider("huggingface-hub") == "huggingface"
 
+    def test_explicit_user_config_provider(self, monkeypatch):
+        monkeypatch.setattr(
+            "hermes_cli.auth.read_raw_config",
+            lambda: {
+                "providers": {
+                    "bifrost": {
+                        "name": "Bifrost",
+                        "api": "http://bifrost:8080/v1",
+                        "key_env": "BIFROST_API_KEY",
+                        "transport": "openai_chat",
+                    }
+                }
+            },
+        )
+        assert resolve_provider("bifrost") == "bifrost"
+
+    def test_explicit_named_custom_provider(self, monkeypatch):
+        monkeypatch.setattr(
+            "hermes_cli.auth.read_raw_config",
+            lambda: {
+                "custom_providers": [
+                    {
+                        "name": "Bifrost",
+                        "base_url": "http://bifrost:8080/v1",
+                    }
+                ]
+            },
+        )
+        assert resolve_provider("custom:bifrost") == "custom:bifrost"
+        assert resolve_provider("bifrost") == "custom:bifrost"
+
     def test_unknown_provider_raises(self):
         with pytest.raises(AuthError):
             resolve_provider("nonexistent-provider-xyz")
@@ -547,6 +578,31 @@ class TestRuntimeProviderResolution:
         result = resolve_runtime_provider(requested="auto")
         assert result["provider"] == "kimi-coding"
         assert result["api_key"] == "auto-kimi-key"
+
+    def test_runtime_provider_uses_user_config_provider(self, monkeypatch):
+        monkeypatch.setenv("BIFROST_API_KEY", "bifrost-secret")
+        from hermes_cli.runtime_provider import resolve_runtime_provider
+
+        monkeypatch.setattr(
+            "hermes_cli.runtime_provider.load_config",
+            lambda: {
+                "providers": {
+                    "bifrost": {
+                        "name": "Bifrost",
+                        "api": "http://bifrost:8080/v1",
+                        "key_env": "BIFROST_API_KEY",
+                        "transport": "openai_chat",
+                    }
+                },
+                "model": {"default": "gemma-3-27b-it", "provider": "bifrost"},
+            },
+        )
+
+        result = resolve_runtime_provider(requested="bifrost")
+        assert result["provider"] == "bifrost"
+        assert result["base_url"] == "http://bifrost:8080/v1"
+        assert result["api_key"] == "bifrost-secret"
+        assert result["api_mode"] == "chat_completions"
 
     def test_runtime_copilot_uses_gh_cli_token(self, monkeypatch):
         monkeypatch.setattr("hermes_cli.copilot_auth._try_gh_cli_token", lambda: "gho_cli_secret")
