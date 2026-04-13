@@ -1,0 +1,42 @@
+name: Nyx Sync Upstream Main
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_branch:
+        description: Upstream branch to mirror into main
+        required: false
+        default: main
+  schedule:
+    - cron: '17 5 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nyx-sync-main
+  cancel-in-progress: false
+
+jobs:
+  sync-main:
+    if: github.repository == 'protocol-nyx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout durable control plane
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: nyx-patches
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync main from upstream
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUSH_TOKEN: ${{ github.token }}
+          UPSTREAM_BRANCH: ${{ inputs.upstream_branch || 'main' }}
+        run: scripts/nyx/sync_main_from_upstream.sh
