@@ -105,7 +105,7 @@ Reason:
 1. Set default branch to `nyx-patches`.
 2. Enable GitHub Actions read/write permissions.
 3. Allow workflows to create and push branches if branch protections require it.
-4. Protect `main` from direct pushes while still allowing the release-sync automation token to update it.
+4. Protect `main` from ordinary direct pushes while allowing the release-sync automation path to rewrite it to the latest adopted release tag.
 5. Protect `nyx-patches` with PR-required checks.
 6. Protect `integration/current` with PR-required checks.
 7. Leave `integration/proposed` unprotected so automation can refresh it.
