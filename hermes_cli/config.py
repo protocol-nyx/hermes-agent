@@ -1543,6 +1543,51 @@ def get_missing_skill_config_vars() -> List[Dict[str, Any]]:
     return missing
 
 
+def providers_dict_to_custom_providers(providers_dict: Any) -> List[Dict[str, Any]]:
+    """Normalize ``providers`` config entries into ``custom_providers`` form.
+
+    Runtime code still expects the legacy list shape in several places. Keep the
+    field mapping in one place so runtime compatibility paths stay aligned with
+    the active config schema.
+    """
+    if not isinstance(providers_dict, dict):
+        return []
+
+    custom_providers: List[Dict[str, Any]] = []
+    for key, entry in providers_dict.items():
+        if not isinstance(entry, dict):
+            continue
+
+        base_url = str(entry.get("api", "") or entry.get("url", "") or entry.get("base_url", "") or "").strip()
+        if not base_url:
+            continue
+
+        name = str(entry.get("name", "") or "").strip() or str(key).strip()
+        if not name:
+            continue
+
+        custom_entry: Dict[str, Any] = {
+            "name": name,
+            "base_url": base_url,
+        }
+
+        api_key = str(entry.get("api_key", "") or "").strip()
+        if api_key:
+            custom_entry["api_key"] = api_key
+
+        api_mode = str(entry.get("transport", "") or "").strip()
+        if api_mode:
+            custom_entry["api_mode"] = api_mode
+
+        model_name = str(entry.get("default_model", "") or "").strip()
+        if model_name:
+            custom_entry["model"] = model_name
+
+        custom_providers.append(custom_entry)
+
+    return custom_providers
+
+
 def check_config_version() -> Tuple[int, int]:
     """
     Check config version.

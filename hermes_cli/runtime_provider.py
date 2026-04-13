@@ -26,7 +26,7 @@ from hermes_cli.auth import (
     resolve_external_process_provider_credentials,
     has_usable_secret,
 )
-from hermes_cli.config import load_config
+from hermes_cli.config import load_config, providers_dict_to_custom_providers
 from hermes_cli.providers import TRANSPORT_TO_API_MODE, resolve_user_provider
 from hermes_constants import OPENROUTER_BASE_URL
 
@@ -284,7 +284,10 @@ def _get_named_custom_provider(requested_provider: str) -> Optional[Dict[str, An
                 "Each entry must be prefixed with '-' in YAML. "
                 "Run 'hermes doctor' for details."
             )
-        return None
+            return None
+        custom_providers = providers_dict_to_custom_providers(config.get("providers"))
+        if not custom_providers:
+            return None
 
     for entry in custom_providers:
         if not isinstance(entry, dict):
@@ -646,15 +649,6 @@ def resolve_runtime_provider(
     """Resolve runtime provider credentials for agent execution."""
     requested_provider = resolve_requested_provider(requested)
 
-    custom_runtime = _resolve_named_custom_runtime(
-        requested_provider=requested_provider,
-        explicit_api_key=explicit_api_key,
-        explicit_base_url=explicit_base_url,
-    )
-    if custom_runtime:
-        custom_runtime["requested_provider"] = requested_provider
-        return custom_runtime
-
     user_config_runtime = _resolve_named_user_config_runtime(
         requested_provider=requested_provider,
         explicit_api_key=explicit_api_key,
@@ -663,6 +657,15 @@ def resolve_runtime_provider(
     if user_config_runtime:
         user_config_runtime["requested_provider"] = requested_provider
         return user_config_runtime
+
+    custom_runtime = _resolve_named_custom_runtime(
+        requested_provider=requested_provider,
+        explicit_api_key=explicit_api_key,
+        explicit_base_url=explicit_base_url,
+    )
+    if custom_runtime:
+        custom_runtime["requested_provider"] = requested_provider
+        return custom_runtime
 
     provider = resolve_provider(
         requested_provider,

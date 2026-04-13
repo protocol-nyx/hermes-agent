@@ -1244,7 +1244,7 @@ def test_get_named_custom_provider_excludes_empty_model(monkeypatch):
         entry = {
             "name": "test-ep",
             "base_url": "https://example.com/v1",
-            "api_key": "key",
+            "api_key": "***",
         }
         if model_val is not None:
             entry["model"] = model_val
@@ -1258,6 +1258,27 @@ def test_get_named_custom_provider_excludes_empty_model(monkeypatch):
         assert "model" not in result, (
             f"model field {model_val!r} should not be included in result"
         )
+
+
+def test_get_named_custom_provider_falls_back_to_providers_dict(monkeypatch):
+    """Runtime lookup should recover migrated providers when custom_providers is absent."""
+    monkeypatch.setattr(rp, "load_config", lambda: {
+        "providers": {
+            "openai-direct": {
+                "name": "openai-direct",
+                "api": "https://api.openai.com/v1",
+                "transport": "codex_responses",
+                "default_model": "gpt-5-mini",
+            }
+        }
+    })
+
+    result = rp._get_named_custom_provider("openai-direct")
+    assert result is not None
+    assert result["name"] == "openai-direct"
+    assert result["base_url"] == "https://api.openai.com/v1"
+    assert result["api_mode"] == "codex_responses"
+    assert result["model"] == "gpt-5-mini"
 
 
 def test_named_custom_runtime_propagates_model_direct_path(monkeypatch):

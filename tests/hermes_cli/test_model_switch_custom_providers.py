@@ -65,6 +65,31 @@ def test_resolve_provider_full_finds_named_custom_provider():
     assert resolved.source == "user-config"
 
 
+def test_list_authenticated_providers_includes_user_provider_models_array(monkeypatch):
+    """User-defined providers should expose configured models, not just default_model."""
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr(providers_mod, "HERMES_OVERLAYS", {})
+
+    providers = list_authenticated_providers(
+        current_provider="bifrost",
+        user_providers={
+            "bifrost": {
+                "name": "Bifrost",
+                "api": "http://bifrost:8080/v1",
+                "default_model": "gemini-2.5-pro",
+                "models": ["gemini-2.5-pro", "gpt-5-mini", "claude-sonnet-4.5"],
+            }
+        },
+        custom_providers=[],
+        max_models=50,
+    )
+
+    bifrost = next((p for p in providers if p["slug"] == "bifrost"), None)
+    assert bifrost is not None
+    assert bifrost["models"] == ["gemini-2.5-pro", "gpt-5-mini", "claude-sonnet-4.5"]
+    assert bifrost["total_models"] == 3
+
+
 def test_switch_model_accepts_explicit_named_custom_provider(monkeypatch):
     """Shared /model switch pipeline should accept --provider for custom_providers."""
     monkeypatch.setattr(
