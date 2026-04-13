@@ -60,7 +60,9 @@ Reason:
 
 ### `nyx-patch-ci.yml`
 - Runs on PRs into `nyx-patches`.
-- Validates Nyx-owned workflow and glue changes before they join the durable patch layer.
+- Lints workflow files with `actionlint`.
+- Runs patch-scoped tests: changed test files when present, otherwise a small smoke suite.
+- Validates Nyx-owned workflow and glue changes before they join the durable patch layer without being blocked by unrelated upstream test drift.
 
 ### `nyx-refresh-integration.yml`
 - Runs after updates to `main` or `nyx-patches`, or by manual dispatch.
@@ -102,7 +104,7 @@ Reason:
 1. Set default branch to `nyx-patches`.
 2. Enable GitHub Actions read/write permissions.
 3. Allow workflows to create and push branches if branch protections require it.
-4. Protect `main` from direct pushes and allow only fork syncing.
+4. Protect `main` from ordinary direct pushes while allowing the release-sync automation path to rewrite it to the latest adopted release tag.
 5. Protect `nyx-patches` with PR-required checks.
 6. Protect `integration/current` with PR-required checks.
 7. Leave `integration/proposed` unprotected so automation can refresh it.
