@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: nyx-refresh-integration
@@ -31,8 +32,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Rebuild integration/current
+      - name: Rebuild integration/proposed
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUSH_TOKEN: ${{ github.token }}
+          INTEGRATION_BRANCH: integration/proposed
         run: scripts/nyx/rebuild_integration_branch.sh
+
+      - name: Open or update PR into integration/current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          existing_pr="$(gh pr list \
+            --head integration/proposed \
+            --base integration/current \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$existing_pr" ]; then
+            gh pr edit "$existing_pr" \
+              --title "Refresh integration/current from main + nyx-patches" \
+              --body "Automated refresh PR. Source branch: \\`integration/proposed\\`. Base branch: \\`integration/current\\`."
+          else
+            gh pr create \
+              --head integration/proposed \
+              --base integration/current \
+              --title "Refresh integration/current from main + nyx-patches" \
+              --body "Automated refresh PR. Source branch: \\`integration/proposed\\`. Base branch: \\`integration/current\\`."
+          fi
