@@ -2,9 +2,9 @@
 
 > For Hermes: implement this plan on `nyx-patches`, then regenerate `integration/current` from `main` plus the patch branch.
 
-Goal: configure the Protocol Nyx `hermes-agent` fork so `main` remains a protected upstream mirror, `nyx-patches` becomes the durable control plane, `integration/proposed` becomes the generated PR branch, and `integration/current` becomes the protected operational and release branch.
+Goal: configure the Protocol Nyx `hermes-agent` fork so `main` remains a protected mirror of the latest upstream release, `nyx-patches` becomes the durable control plane, `integration/proposed` becomes the generated PR branch, and `integration/current` becomes the protected operational and release branch.
 
-Architecture: keep upstream state, durable fork glue, generated candidate state, and release state on separate branches. Host durable workflows on `nyx-patches` because scheduled workflows require a stable default branch. Rebuild `integration/proposed` from `main` and `nyx-patches`, then flow changes into `integration/current` only through PRs.
+Architecture: keep upstream release state, durable fork glue, generated candidate state, and release state on separate branches. Host durable workflows on `nyx-patches` because scheduled workflows require a stable default branch. Poll upstream releases every 6 hours, update `main` only when a newer release tag exists, then rebuild `integration/proposed` from `main` and `nyx-patches` and flow changes into `integration/current` only through PRs.
 
 Tech stack: Git, GitHub Actions, GHCR, pytest, uv, Docker Buildx, actionlint.
 

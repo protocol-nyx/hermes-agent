@@ -5,9 +5,9 @@ This document is the canonical operating model for Protocol Nyx's `hermes-agent`
 ## Branch roles
 
 ### `main`
-- Exact upstream sync mirror.
+- Protected mirror of the latest adopted upstream release.
 - Disposable by design.
-- Updated by automation from `upstream/main`.
+- Updated by automation only when upstream publishes a newer release.
 - Never used as the durable home for Nyx-specific workflows, release logic, or glue code.
 
 ### `nyx-patches`
@@ -35,7 +35,7 @@ This document is the canonical operating model for Protocol Nyx's `hermes-agent`
 
 ## Core rules
 
-1. `main` stays upstream-syncable and protected.
+1. `main` stays protected and tracks the latest adopted upstream release, not arbitrary upstream branch commits.
 2. Durable Nyx automation lives on `nyx-patches`, not on `main`.
 3. `integration/proposed` is generated and may be force-updated.
 4. `integration/current` is protected and updated only through PRs.
@@ -54,9 +54,10 @@ Reason:
 ## Workflow responsibilities
 
 ### `nyx-sync-main.yml`
-- Runs on schedule or manual dispatch.
-- Uses GitHub's fork-sync API to sync `main` from upstream.
-- Keeps `main` protected against normal pushes while still allowing fork sync.
+- Runs every 6 hours or by manual dispatch.
+- Polls the upstream repository's latest stable release.
+- Compares the upstream release tag commit to the commit currently pointed to by `main`.
+- Updates `main` only when a newer upstream release is available.
 
 ### `nyx-patch-ci.yml`
 - Runs on PRs into `nyx-patches`.
@@ -112,6 +113,6 @@ Reason:
 
 - `integration/current` should be treated as generated state, not handcrafted truth.
 - The durable truth for Nyx-specific repo behavior is `nyx-patches`.
-- Upstream breakage is absorbed by the `main` sync step.
+- Upstream adoption happens at release boundaries, not at arbitrary mid-release commits.
 - Compatibility breakage is surfaced by the `integration/current` rebuild and test cycle.
 - Release artifacts are produced from the branch that actually represents what Nyx intends to ship.

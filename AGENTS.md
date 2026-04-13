@@ -12,7 +12,7 @@ source venv/bin/activate  # ALWAYS activate before running Python
 
 This fork uses a four-layer branch model.
 
-- `main` = upstream sync mirror. Protected. Only GitHub fork sync should update it.
+- `main` = protected mirror of the latest adopted upstream release. It should move only when upstream ships a newer release.
 - `nyx-patches` = durable Nyx control plane. All custom workflows, release glue, and fork-only behavior live here.
 - `integration/proposed` = generated candidate branch. Automation rebuilds it from `main` plus a merge of `nyx-patches` and opens a PR.
 - `integration/current` = protected operational branch. It receives updates only by PR from `integration/proposed`, then drives integration tests, releases, and downstream notifications.
