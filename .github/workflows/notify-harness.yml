@@ -2,7 +2,9 @@ name: Notify Harness On Hermes Update
 
 on:
   push:
-    branches: [main]
+    branches: [integration/current]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:

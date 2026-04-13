@@ -1,0 +1,38 @@
+name: Nyx Refresh Integration Branch
+
+on:
+  push:
+    branches:
+      - main
+      - nyx-patches
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nyx-refresh-integration
+  cancel-in-progress: true
+
+jobs:
+  rebuild-integration:
+    if: github.repository == 'protocol-nyx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout durable control plane
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: nyx-patches
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebuild integration/current
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUSH_TOKEN: ${{ github.token }}
+        run: scripts/nyx/rebuild_integration_branch.sh
