@@ -1,0 +1,122 @@
+name: Nyx Integration Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to release from
+        required: true
+        default: integration/current
+      tag:
+        description: Release tag to create or publish
+        required: true
+      publish_latest:
+        description: Also publish the latest tag
+        required: false
+        type: boolean
+        default: true
+  push:
+    tags:
+      - 'nyx-v*'
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: nyx-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    if: github.repository == 'protocol-nyx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hermes-agent
+      RELEASE_REF: ${{ inputs.ref || github.ref_name }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      PUBLISH_LATEST: ${{ inputs.publish_latest != false }}
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_REF }}
+
+      - name: Fetch integration branch
+        run: git fetch origin integration/current
+
+      - name: Ensure release commit is on integration/current
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/integration/current; then
+            echo "Release ref must be contained in origin/integration/current"
+            exit 1
+          fi
+
+      - name: Create and push release tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG" --force
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE_NAME }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test image startup
+        run: |
+          docker run --rm \
+            -v /tmp/hermes-test:/opt/data \
+            --entrypoint /opt/hermes/docker/entrypoint.sh \
+            $IMAGE_NAME:test --help
+
+      - name: Compute release tags
+        id: meta
+        run: |
+          TAGS="$IMAGE_NAME:$RELEASE_TAG,$IMAGE_NAME:${GITHUB_SHA}"
+          if [ "$PUBLISH_LATEST" = "true" ]; then
+            TAGS="$TAGS,$IMAGE_NAME:latest"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Publish multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
+            && gh release edit "$RELEASE_TAG" --target "$GITHUB_SHA" --notes "Container image: $IMAGE_NAME:$RELEASE_TAG" \
+            || gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --generate-notes --notes "Container image: $IMAGE_NAME:$RELEASE_TAG"

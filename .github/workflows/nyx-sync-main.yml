@@ -1,0 +1,32 @@
+name: Nyx Sync Main To Latest Upstream Release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nyx-sync-main
+  cancel-in-progress: false
+
+jobs:
+  sync-main:
+    if: github.repository == 'protocol-nyx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout durable control plane
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: nyx-patches
+
+      - name: Sync main to latest upstream release
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.NYX_GH_TOKEN }}
+          UPSTREAM_REPO: NousResearch/hermes-agent
+        run: scripts/nyx/sync_main_from_upstream.sh
