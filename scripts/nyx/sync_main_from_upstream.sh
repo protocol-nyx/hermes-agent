@@ -6,6 +6,12 @@ TARGET_BRANCH="${TARGET_BRANCH:-main}"
 UPSTREAM_REPO="${UPSTREAM_REPO:-NousResearch/hermes-agent}"
 GH_TOKEN="${GH_TOKEN:-${PUSH_TOKEN:-}}"
 SOURCE_REMOTE_URL="${SOURCE_REMOTE_URL:-https://github.com/${UPSTREAM_REPO}.git}"
+TARGET_REMOTE="${TARGET_REMOTE:-origin}"
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Must be run inside a git repository" >&2
+  exit 1
+fi
 
 if [ -z "$REPO" ]; then
   echo "GITHUB_REPOSITORY or REPO must be set" >&2
@@ -36,12 +42,16 @@ if [ "$current_main_sha" = "$release_sha" ]; then
   exit 0
 fi
 
-echo "Updating ${REPO}:${TARGET_BRANCH} from ${current_main_sha} to ${latest_tag} (${release_sha})"
+repo_url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+orig_url="$(git remote get-url "$TARGET_REMOTE")"
+cleanup() {
+  git remote set-url "$TARGET_REMOTE" "$orig_url"
+}
+trap cleanup EXIT
 
-gh api \
-  -X PATCH \
-  "repos/${REPO}/git/refs/heads/${TARGET_BRANCH}" \
-  -f sha="$release_sha" \
-  -F force=true >/dev/null
+git remote set-url "$TARGET_REMOTE" "$repo_url"
+
+echo "Updating ${REPO}:${TARGET_BRANCH} from ${current_main_sha} to ${latest_tag} (${release_sha})"
+git push "$TARGET_REMOTE" "${release_sha}:refs/heads/${TARGET_BRANCH}" --force-with-lease="refs/heads/${TARGET_BRANCH}:${current_main_sha}"
 
 echo "Updated ${TARGET_BRANCH} to latest upstream release ${latest_tag}"
