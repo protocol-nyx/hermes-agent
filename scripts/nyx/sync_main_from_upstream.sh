@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-UPSTREAM_BRANCH="${UPSTREAM_BRANCH:-main}"
-TARGET_REMOTE="${TARGET_REMOTE:-origin}"
+REPO="${REPO:-${GITHUB_REPOSITORY:-}}"
 TARGET_BRANCH="${TARGET_BRANCH:-main}"
-PUSH_TOKEN="${PUSH_TOKEN:-}"
+GH_TOKEN="${GH_TOKEN:-${PUSH_TOKEN:-}}"
 
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "Must be run inside a git repository" >&2
+if [ -z "$REPO" ]; then
+  echo "GITHUB_REPOSITORY or REPO must be set" >&2
   exit 1
 fi
 
-if [ -n "$PUSH_TOKEN" ]; then
-  repo_url="https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-  git remote set-url "$TARGET_REMOTE" "$repo_url"
+if [ -z "$GH_TOKEN" ]; then
+  echo "GH_TOKEN (or PUSH_TOKEN) must be set" >&2
+  exit 1
 fi
 
-echo "Fetching ${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}"
-git fetch --prune "$UPSTREAM_REMOTE" "$UPSTREAM_BRANCH"
+export GH_TOKEN
 
-echo "Resetting ${TARGET_BRANCH} to ${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}"
-git checkout -B "$TARGET_BRANCH" "${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}"
-
-echo "Pushing ${TARGET_BRANCH} to ${TARGET_REMOTE}"
-git push "$TARGET_REMOTE" "$TARGET_BRANCH" --force-with-lease
+echo "Syncing ${REPO}:${TARGET_BRANCH} from upstream via GitHub fork-sync API"
+gh api \
+  -X POST \
+  "repos/${REPO}/merge-upstream" \
+  -f branch="$TARGET_BRANCH"

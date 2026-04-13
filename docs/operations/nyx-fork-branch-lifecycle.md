@@ -16,11 +16,16 @@ This document is the canonical operating model for Protocol Nyx's `hermes-agent`
 - Holds all custom GitHub Actions workflows, release glue, branch automation, and fork-only behavior.
 - All feature work lands here through reviewed PRs from `issue/*` or `dev/*` branches.
 
-### `integration/current`
-- Generated operational branch.
+### `integration/proposed`
+- Generated candidate branch.
 - Rebuilt from `main` plus a merge of `nyx-patches`.
-- Runs integration tests, container build validation, and release automation.
 - Safe to overwrite and regenerate.
+- Always the PR source branch into `integration/current`.
+
+### `integration/current`
+- Protected operational branch.
+- Updated only by PR from `integration/proposed`.
+- Runs integration tests, container build validation, and release automation.
 - Source branch for artifact publication and GitHub Releases.
 
 ### `issue/*` and `dev/*`
@@ -30,11 +35,12 @@ This document is the canonical operating model for Protocol Nyx's `hermes-agent`
 
 ## Core rules
 
-1. `main` stays upstream-syncable.
+1. `main` stays upstream-syncable and protected.
 2. Durable Nyx automation lives on `nyx-patches`, not on `main`.
-3. `integration/current` is generated and may be force-updated.
-4. If a fix is discovered on `integration/current`, port it back to `nyx-patches` immediately.
-5. New custom behavior must enter through `issue/*` -> PR -> `nyx-patches`.
+3. `integration/proposed` is generated and may be force-updated.
+4. `integration/current` is protected and updated only through PRs.
+5. If a fix is discovered on `integration/current`, port it back to `nyx-patches` immediately.
+6. New custom behavior must enter through `issue/*` -> PR -> `nyx-patches`.
 
 ## Default branch
 
@@ -49,9 +55,8 @@ Reason:
 
 ### `nyx-sync-main.yml`
 - Runs on schedule or manual dispatch.
-- Fetches `upstream/main`.
-- Resets local `main` to `upstream/main`.
-- Pushes `main` back to `origin`.
+- Uses GitHub's fork-sync API to sync `main` from upstream.
+- Keeps `main` protected against normal pushes while still allowing fork sync.
 
 ### `nyx-patch-ci.yml`
 - Runs on PRs into `nyx-patches`.
@@ -59,9 +64,10 @@ Reason:
 
 ### `nyx-refresh-integration.yml`
 - Runs after updates to `main` or `nyx-patches`, or by manual dispatch.
-- Recreates `integration/current` from `origin/main`.
+- Recreates `integration/proposed` from `origin/main`.
 - Merges `origin/nyx-patches` into it.
-- Force-pushes the regenerated branch.
+- Force-pushes `integration/proposed`.
+- Opens or updates a PR from `integration/proposed` into `integration/current`.
 
 ### `tests.yml`
 - Runs the Python test suite on `integration/current`.
@@ -86,19 +92,21 @@ Reason:
 4. Open PR into `nyx-patches`.
 5. `nyx-patch-ci.yml` validates the patch.
 6. Merge PR into `nyx-patches`.
-7. `nyx-refresh-integration.yml` rebuilds `integration/current` from `main` + `nyx-patches`.
-8. `tests.yml` validates `integration/current`.
-9. `nyx-release.yml` publishes a container image from `integration/current` and creates a GitHub Release.
+7. `nyx-refresh-integration.yml` rebuilds `integration/proposed` from `main` + `nyx-patches` and opens/updates a PR into `integration/current`.
+8. `tests.yml` validates the PR and branch state for `integration/current`.
+9. Merge the integration PR into `integration/current`.
+10. `nyx-release.yml` publishes a container image from `integration/current` and creates a GitHub Release.
 
 ## GitHub repository settings to apply
 
 1. Set default branch to `nyx-patches`.
 2. Enable GitHub Actions read/write permissions.
 3. Allow workflows to create and push branches if branch protections require it.
-4. Protect `main` from direct human pushes.
+4. Protect `main` from direct pushes and allow only fork syncing.
 5. Protect `nyx-patches` with PR-required checks.
-6. Protect `integration/current` enough to guard releases, while allowing the refresh workflow to update it.
-7. Enable GitHub Packages / GHCR publishing for the repo.
+6. Protect `integration/current` with PR-required checks.
+7. Leave `integration/proposed` unprotected so automation can refresh it.
+8. Enable GitHub Packages / GHCR publishing for the repo.
 
 ## Operational notes
 

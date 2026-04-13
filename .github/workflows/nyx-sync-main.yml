@@ -2,11 +2,6 @@ name: Nyx Sync Upstream Main
 
 on:
   workflow_dispatch:
-    inputs:
-      upstream_branch:
-        description: Upstream branch to mirror into main
-        required: false
-        default: main
   schedule:
     - cron: '17 5 * * *'
 
@@ -29,14 +24,8 @@ jobs:
           fetch-depth: 0
           ref: nyx-patches
 
-      - name: Configure git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Sync main from upstream
+      - name: Sync main from upstream via GitHub fork sync
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PUSH_TOKEN: ${{ github.token }}
-          UPSTREAM_BRANCH: ${{ inputs.upstream_branch || 'main' }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/nyx/sync_main_from_upstream.sh

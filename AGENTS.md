@@ -10,14 +10,15 @@ source venv/bin/activate  # ALWAYS activate before running Python
 
 ## Fork Branch Strategy (Protocol Nyx)
 
-This fork uses a three-layer branch model.
+This fork uses a four-layer branch model.
 
-- `main` = upstream sync mirror. Treat as ephemeral and upstream-owned.
+- `main` = upstream sync mirror. Protected. Only GitHub fork sync should update it.
 - `nyx-patches` = durable Nyx control plane. All custom workflows, release glue, and fork-only behavior live here.
-- `integration/current` = generated operational branch. It is rebuilt from `main` plus a merge of `nyx-patches`, then used for integration tests and releases.
+- `integration/proposed` = generated candidate branch. Automation rebuilds it from `main` plus a merge of `nyx-patches` and opens a PR.
+- `integration/current` = protected operational branch. It receives updates only by PR from `integration/proposed`, then drives integration tests, releases, and downstream notifications.
 - `issue/*` and `dev/*` branches must branch from `nyx-patches` and merge back into `nyx-patches` by PR.
 
-Do not put durable Nyx-only automation directly on `main`. If a fix is made while debugging `integration/current`, port it back to `nyx-patches` immediately.
+Do not put durable Nyx-only automation directly on `main`. Do not hand-edit `integration/proposed`. If a fix is discovered while validating or releasing from `integration/current`, port it back to `nyx-patches` immediately.
 
 ## Project Structure
 
