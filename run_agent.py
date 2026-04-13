@@ -94,7 +94,7 @@ from agent.model_metadata import (
 from agent.context_compressor import ContextCompressor
 from agent.subdirectory_hints import SubdirectoryHintTracker
 from agent.prompt_caching import apply_anthropic_cache_control
-from agent.prompt_builder import build_skills_system_prompt, build_context_files_prompt, build_environment_hints, load_soul_md, TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, DEVELOPER_ROLE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE, OPENAI_MODEL_EXECUTION_GUIDANCE
+from agent.prompt_builder import build_skills_system_prompt, build_context_files_prompt, load_soul_md, TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, DEVELOPER_ROLE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE, OPENAI_MODEL_EXECUTION_GUIDANCE
 from agent.usage_pricing import estimate_usage_cost, normalize_usage
 from agent.display import (
     KawaiiSpinner, build_tool_preview as _build_tool_preview,
@@ -1307,7 +1307,6 @@ class AIAgent:
                 api_key=getattr(self, "api_key", ""),
                 config_context_length=_config_context_length,
                 provider=self.provider,
-                api_mode=self.api_mode,
             )
         self.compression_enabled = compression_enabled
 
@@ -1564,7 +1563,6 @@ class AIAgent:
                 base_url=self.base_url,
                 api_key=getattr(self, "api_key", ""),
                 provider=self.provider,
-                api_mode=self.api_mode,
             )
 
         # ── Invalidate cached system prompt so it rebuilds next turn ──
@@ -1698,16 +1696,6 @@ class AIAgent:
             except Exception:
                 logger.debug("status_callback error in _emit_status", exc_info=True)
 
-    def _current_main_runtime(self) -> Dict[str, str]:
-        """Return the live main runtime for session-scoped auxiliary routing."""
-        return {
-            "model": getattr(self, "model", "") or "",
-            "provider": getattr(self, "provider", "") or "",
-            "base_url": getattr(self, "base_url", "") or "",
-            "api_key": getattr(self, "api_key", "") or "",
-            "api_mode": getattr(self, "api_mode", "") or "",
-        }
-
     def _check_compression_model_feasibility(self) -> None:
         """Warn at session start if the auxiliary compression model's context
         window is smaller than the main model's compression threshold.
@@ -1728,10 +1716,7 @@ class AIAgent:
             from agent.auxiliary_client import get_text_auxiliary_client
             from agent.model_metadata import get_model_context_length
 
-            client, aux_model = get_text_auxiliary_client(
-                "compression",
-                main_runtime=self._current_main_runtime(),
-            )
+            client, aux_model = get_text_auxiliary_client("compression")
             if client is None or not aux_model:
                 msg = (
                     "⚠ No auxiliary LLM provider configured — context "
@@ -1872,13 +1857,12 @@ class AIAgent:
         if not content:
             return ""
         # Strip all reasoning tag variants: <think>, <thinking>, <THINKING>,
-        # <reasoning>, <REASONING_SCRATCHPAD>, <thought> (Gemma 4)
+        # <reasoning>, <REASONING_SCRATCHPAD>
         content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
         content = re.sub(r'<thinking>.*?</thinking>', '', content, flags=re.DOTALL | re.IGNORECASE)
         content = re.sub(r'<reasoning>.*?</reasoning>', '', content, flags=re.DOTALL)
         content = re.sub(r'<REASONING_SCRATCHPAD>.*?</REASONING_SCRATCHPAD>', '', content, flags=re.DOTALL)
-        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'</?(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>\s*', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'</?(?:think|thinking|reasoning|REASONING_SCRATCHPAD)>\s*', '', content, flags=re.IGNORECASE)
         return content
 
     def _looks_like_codex_intermediate_ack(
@@ -3193,12 +3177,6 @@ class AIAgent:
                 f"When asked what model you are, always answer based on this information, "
                 f"not on any model name returned by the API."
             )
-
-        # Environment hints (WSL, Termux, etc.) — tell the agent about the
-        # execution environment so it can translate paths and adapt behavior.
-        _env_hints = build_environment_hints()
-        if _env_hints:
-            prompt_parts.append(_env_hints)
 
         platform_key = (self.platform or "").lower().strip()
         if platform_key in PLATFORM_HINTS:
@@ -6570,23 +6548,17 @@ class AIAgent:
             if messages and messages[-1].get("_flush_sentinel") == _sentinel:
                 messages.pop()
 
-    def _compress_context(self, messages: list, system_message: str, *, approx_tokens: int = None, task_id: str = "default", focus_topic: str = None) -> tuple:
+    def _compress_context(self, messages: list, system_message: str, *, approx_tokens: int = None, task_id: str = "default") -> tuple:
         """Compress conversation context and split the session in SQLite.
-
-        Args:
-            focus_topic: Optional focus string for guided compression — the
-                summariser will prioritise preserving information related to
-                this topic.  Inspired by Claude Code's ``/compact <focus>``.
 
         Returns:
             (compressed_messages, new_system_prompt) tuple
         """
         _pre_msg_count = len(messages)
         logger.info(
-            "context compression started: session=%s messages=%d tokens=~%s model=%s focus=%r",
+            "context compression started: session=%s messages=%d tokens=~%s model=%s",
             self.session_id or "none", _pre_msg_count,
             f"{approx_tokens:,}" if approx_tokens else "unknown", self.model,
-            focus_topic,
         )
         # Pre-compression memory flush: let the model save memories before they're lost
         self.flush_memories(messages, min_turns=0)
@@ -6598,7 +6570,7 @@ class AIAgent:
             except Exception:
                 pass
 
-        compressed = self.context_compressor.compress(messages, current_tokens=approx_tokens, focus_topic=focus_topic)
+        compressed = self.context_compressor.compress(messages, current_tokens=approx_tokens)
 
         todo_snapshot = self._todo_store.format_for_injection()
         if todo_snapshot:

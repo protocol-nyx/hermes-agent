@@ -6,14 +6,11 @@ Compatibility wrappers remain for direct Python callers and legacy tests.
 """
 
 import json
-import logging
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-logger = logging.getLogger(__name__)
 
 # Import from cron module (will be available when properly installed)
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -71,17 +68,11 @@ def _origin_from_env() -> Optional[Dict[str, str]]:
     origin_platform = get_session_env("HERMES_SESSION_PLATFORM")
     origin_chat_id = get_session_env("HERMES_SESSION_CHAT_ID")
     if origin_platform and origin_chat_id:
-        thread_id = get_session_env("HERMES_SESSION_THREAD_ID") or None
-        if thread_id:
-            logger.debug(
-                "Cron origin captured thread_id=%s for %s:%s",
-                thread_id, origin_platform, origin_chat_id,
-            )
         return {
             "platform": origin_platform,
             "chat_id": origin_chat_id,
             "chat_name": get_session_env("HERMES_SESSION_CHAT_NAME") or None,
-            "thread_id": thread_id,
+            "thread_id": get_session_env("HERMES_SESSION_THREAD_ID") or None,
         }
     return None
 
@@ -465,7 +456,7 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
             },
             "deliver": {
                 "type": "string",
-                "description": "Omit this parameter to auto-deliver back to the current chat and topic (recommended). Auto-detection preserves thread/topic context. Only set explicitly when the user asks to deliver somewhere OTHER than the current conversation. Values: 'origin' (same as omitting), 'local' (no delivery, save only), or platform:chat_id:thread_id for a specific destination. Examples: 'telegram:-1001234567890:17585', 'discord:#engineering'. WARNING: 'platform:chat_id' without :thread_id loses topic targeting."
+                "description": "Delivery target: origin, local, telegram, discord, slack, whatsapp, signal, weixin, matrix, mattermost, homeassistant, dingtalk, feishu, wecom, wecom_callback, email, sms, bluebubbles, or platform:chat_id or platform:chat_id:thread_id for Telegram topics. Examples: 'origin', 'local', 'telegram', 'telegram:-1001234567890:17585', 'discord:#engineering'"
             },
             "skills": {
                 "type": "array",
