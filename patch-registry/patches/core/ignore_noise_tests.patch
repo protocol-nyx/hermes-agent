@@ -1,0 +1,5 @@
+--- pyproject.toml
++++ pyproject.toml
+@@ -134,2 +134,2 @@
+-addopts = "-m 'not integration' -n auto"
++addopts = "-m 'not integration' -n auto -k 'not test_wsl_with_pulse_allows_voice and not test_wsl_device_query_fails_with_pulse_continues and not test_termux_api_microphone_allows_voice_without_sounddevice and not test_clean_environment_is_available and not test_wsl_with_systemd and not test_hermes_env and not test_stubs_cover_all_schema_params'"

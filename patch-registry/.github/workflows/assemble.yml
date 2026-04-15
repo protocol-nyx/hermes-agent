@@ -1,0 +1,59 @@
+
+name: Modular Core Assembly
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Poll every 6 hours
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync-and-assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Patch Registry
+        uses: actions/checkout@v4
+        with:
+          repository: protocol-nyx/hermes-agent-registry 
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Check Upstream Version
+        id: version_check
+        run: |
+          # Clone upstream to get latest tag
+          git clone --depth 1 https://github.com/NousResearch/hermes-agent.git upstream_tmp
+          LATEST_TAG=$(git -C upstream_tmp describe --tags `git -C upstream_tmp rev-list --tags --max-count=1`)
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+          
+          # Check current main of our fork
+          CURRENT_MAIN=$(git ls-remote https://github.com/protocol-nyx/hermes-agent.git refs/heads/main | awk '{print $1}')
+          TAG_SHA=$(git -C upstream_tmp rev-parse $LATEST_TAG)
+          
+          if [ "$CURRENT_MAIN" == "$TAG_SHA" ]; then
+            echo "SYNC_REQUIRED=false" >> $GITHUB_OUTPUT
+            echo "Fork main is already at latest tag $LATEST_TAG. Skipping sync."
+          else
+            echo "SYNC_REQUIRED=true" >> $GITHUB_OUTPUT
+            echo "Fork main is outdated. Upstream is at $LATEST_TAG."
+          fi
+          rm -rf upstream_tmp
+
+      - name: Sync Main and Mirror Tags
+        if: steps.version_check.outputs.SYNC_REQUIRED == 'true'
+        run: |
+          git clone --mirror https://github.com/NousResearch/hermes-agent.git upstream_mirror
+          cd upstream_mirror
+          LATEST_TAG=${{ steps.version_check.outputs.LATEST_TAG }}
+          git remote add origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/protocol-nyx/hermes-agent.git
+          git push origin --tags
+          git checkout $LATEST_TAG
+          git push origin HEAD:main --force
+          cd ..
+          rm -rf upstream_mirror
+
+      - name: Run Assembler
+        # Run assembler if sync happened OR if manual trigger (to ensure integration is current)
+        if: steps.version_check.outputs.SYNC_REQUIRED == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN_NYX: ${{ secrets.GH_TOKEN }}
+        run: |
+          pip install PyYAML
+          python3 assembler.py

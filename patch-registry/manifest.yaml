@@ -1,0 +1,21 @@
+
+groups:
+  - name: core
+    priority: 1
+    patches: []
+  - name: cli
+    priority: 2
+    patches: []
+  - name: gateway
+    priority: 3
+    patches: []
+  - name: ops
+    priority: 4
+    patches: []
+  - name: tests
+    priority: 5
+    patches: []
+
+meta:
+  base_tag: v2026.4.13
+  last_assembled: null
